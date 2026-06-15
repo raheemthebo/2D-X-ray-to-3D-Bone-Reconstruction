@@ -2,6 +2,7 @@
 
 Deep learning framework for reconstructing anatomical 3D bone meshes (knee, thorax/ribcage, spine) from standard 2D radiographs. Features a ConvNeXt-based biplanar encoder, neural implicit field decoder, FastAPI backend, and an interactive 3D WebGL viewer.
 
+
 ## Brief Idea
 We are building an AI tool that turns standard 2D X-rays into 3D bone structure. Our goal is to solve two massive global problems:
 

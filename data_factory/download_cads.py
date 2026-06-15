@@ -4,13 +4,13 @@ Download CADS dataset subsets from HuggingFace.
 CADS (huggingface/CADS-dataset) aggregates 43 medical imaging datasets with unified
 segmentation labels. We download subsets that have bone data:
 
-  0037_totalsegmentator — 1,203 full-body CTs (all bones)
-  0010_verse            — 450 vertebra CTs (spine)
-  0013_ribfrac          — 360 rib CTs (ribs + chest)
+  0037_totalsegmentator - 1,203 full-body CTs (all bones)
+  0010_verse            - 450 vertebra CTs (spine)
+  0013_ribfrac          - 360 rib CTs (ribs + chest)
 
 For each subject we download:
-  - images/{subject_id}_0000.nii.gz          — CT volume
-  - segmentations/{subject_id}/{subject_id}_part_559.nii.gz — bone mask (label 5)
+  - images/{subject_id}_0000.nii.gz          - CT volume
+  - segmentations/{subject_id}/{subject_id}_part_559.nii.gz - bone mask (label 5)
 
 Usage:
     python data_factory/download_cads.py --output-dir /scratch/cads
