@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Data directories (large files, not for git)
+data_factory/raw/
+data_factory/extracted/
+data_factory/glb_output/
+data_factory/xray_output/
+data_factory/training_data/
+data_factory/backups/
+samples/
+
+# Model checkpoints and backups (large binaries)
+model/checkpoints/
+model/backups/
+
+# Model logs — TRACKED (not ignored)
+# model/logs/ is version controlled for experiment tracking
+
+# Inference outputs
+*.glb
+
+# Slurm output
+slurm_*.out
+
+# Environment variables
+.env
+
+# OS
+.DS_Store
+
+# Backend runtime data
+backend/uploads/
+backend/outputs/
+
+# Frontend build & deps
+frontend/node_modules/
+frontend/dist/
+
+# Claude
+.claude
+
+test_samples/
+test_images/
+val_samples/
+output/
+potential_samples/
+potential_xrays/
+
+PKG - CT-ORG.zip
+

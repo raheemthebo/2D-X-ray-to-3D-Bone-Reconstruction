@@ -1,0 +1,27 @@
+[project]
+name = "expo-ai"
+version = "0.1.0"
+description = "X2BR: X-ray to 3D Bone Reconstruction"
+requires-python = ">=3.11"
+dependencies = [
+    "scipy",
+    "numpy",
+    "trimesh",
+    "matplotlib",
+    "pydicom",
+    "nibabel",
+    "scikit-image",
+    "fast-simplification",
+    "pyrender",
+    "pyglet",
+    "Pillow",
+    "Rtree",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "huggingface-hub",
+    "TotalSegmentator",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+]
