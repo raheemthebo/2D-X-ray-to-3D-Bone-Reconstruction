@@ -69,6 +69,7 @@ async def predict(
     ap: UploadFile = File(...),
     lat: UploadFile | None = File(None),
     preprocess: str = Form("true"),
+    region: str = Form("auto"),
 ):
     """Upload AP (+ optional LAT) X-ray images and get a 3D bone mesh back."""
     do_preprocess = preprocess.lower() not in ("false", "0", "no")
@@ -100,13 +101,14 @@ async def predict(
     # Run inference
     glb_path = job_output / "prediction.glb"
     try:
-        infer_single(
+        mesh, detected_region = infer_single(
             model,
             str(ap_path),
             str(lat_path) if lat_path else None,
             device,
             output=str(glb_path),
             preprocess=do_preprocess,
+            region=region,
         )
     except Exception as e:
         traceback.print_exc()
@@ -118,6 +120,9 @@ async def predict(
         "glb_url": f"/outputs/{job_id}/prediction.glb",
         "ap_url": f"/uploads/{job_id}/{ap_path.name}",
         "ap_preprocessed_url": f"/outputs/{job_id}/prediction_ap_preprocessed.png",
+        "detected_region": detected_region,
+        "vertices": len(mesh.vertices),
+        "faces": len(mesh.faces),
     }
     if lat_path:
         result["lat_url"] = f"/uploads/{job_id}/{lat_path.name}"

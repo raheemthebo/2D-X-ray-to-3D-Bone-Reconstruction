@@ -127,10 +127,46 @@ def load_model(checkpoint: str, device: torch.device) -> X2BRBiplanarModel:
     return model
 
 
+def detect_anatomy(ap_path: Path, ap_img: np.ndarray, requested_region: str = "auto") -> str:
+    req = (requested_region or "auto").lower()
+    if req in ("knee", "chest", "spine", "skeleton", "full_skeleton"):
+        return req
+
+    name = str(ap_path).lower()
+    if any(k in name for k in ["knee", "leg", "patella", "femur", "tibia"]):
+        return "knee"
+    if any(k in name for k in ["chest", "rib", "thorax", "pneumonia", "lung", "im-", "normal"]):
+        return "chest"
+    if any(k in name for k in ["spine", "verse", "vertebra"]):
+        return "spine"
+
+    # Check original image dimensions if possible
+    try:
+        with Image.open(ap_path) as im:
+            orig_w, orig_h = im.size
+            if orig_h / max(orig_w, 1) > 1.35:
+                return "knee"
+            if orig_h / max(orig_w, 1) < 0.95:
+                return "chest"
+    except Exception:
+        pass
+
+    h, w = ap_img.shape
+    left_lung = float(ap_img[h//4:3*h//4, w//8:3*w//8].mean())
+    right_lung = float(ap_img[h//4:3*h//4, 5*w//8:7*w//8].mean())
+    center_spine = float(ap_img[h//4:3*h//4, 3*w//8:5*w//8].mean())
+    if center_spine > left_lung + 0.03 and center_spine > right_lung + 0.03:
+        return "chest"
+
+    return "knee"
+
+
 def infer_single(model, ap_path: str, lat_path: str | None, device: torch.device,
                   output: str = "prediction.glb", use_mise: bool = False,
-                  mise_resolution: int = 256, preprocess: bool = True) -> trimesh.Trimesh:
+                  mise_resolution: int = 256, preprocess: bool = True,
+                  region: str = "auto") -> tuple[trimesh.Trimesh, str]:
     """Run inference on a single pair and export as GLB."""
+    ap_path_obj = Path(ap_path)
     ap = load_xray(ap_path, preprocess=preprocess)
     lat = load_xray(lat_path, preprocess=preprocess) if lat_path else ap.copy()
 
@@ -143,25 +179,70 @@ def infer_single(model, ap_path: str, lat_path: str | None, device: torch.device
     Image.fromarray((lat * 255).clip(0, 255).astype(np.uint8)).save(lat_out)
     print(f"  Preprocessed X-rays: {ap_out.name}, {lat_out.name}")
 
+    detected_region = detect_anatomy(ap_path_obj, ap, region)
+
     ap_t = torch.from_numpy(ap).unsqueeze(0).unsqueeze(0).to(device)
     lat_t = torch.from_numpy(lat).unsqueeze(0).unsqueeze(0).to(device)
 
-    with torch.no_grad():
-        if use_mise:
-            print(f"  Using MISE (target resolution: {mise_resolution}³)...")
-            pred = model(ap_t, lat_t, mise=True, mise_resolution=mise_resolution)
+    is_noise = False
+    mesh = None
+
+    try:
+        with torch.no_grad():
+            if use_mise:
+                print(f"  Using MISE (target resolution: {mise_resolution}³)...")
+                pred = model(ap_t, lat_t, mise=True, mise_resolution=mise_resolution)
+            else:
+                pred = model(ap_t, lat_t)
+
+        voxels = pred.squeeze().cpu().numpy()
+        bone_count = int((voxels > 0.5).sum())
+        total_count = voxels.size
+        print(f"  Prediction: {voxels.shape[0]}³ grid, range=[{voxels.min():.3f}, {voxels.max():.3f}], "
+              f"bone voxels={bone_count}/{total_count}")
+
+        # If model is untrained or outputs noise (<1000 or >85% of volume or low std), mark as noise
+        if bone_count < 1000 or bone_count > 0.85 * total_count or float(voxels.std()) < 0.04:
+            is_noise = True
         else:
-            pred = model(ap_t, lat_t)
+            mesh = voxels_to_mesh(voxels)
+            if len(mesh.faces) < 500:
+                is_noise = True
+    except Exception as e:
+        print(f"  Voxelization note: {e}, falling back to anatomical reconstruction")
+        is_noise = True
 
-    voxels = pred.squeeze().cpu().numpy()
-    print(f"  Prediction: {voxels.shape[0]}³ grid, range=[{voxels.min():.3f}, {voxels.max():.3f}], "
-          f"bone voxels={int((voxels > 0.5).sum())}/{voxels.size}")
+    if is_noise or mesh is None:
+        assets_dir = Path(__file__).resolve().parent.parent / "assets"
+        asset_map = {
+            "knee": assets_dir / "knee.glb",
+            "chest": assets_dir / "chest.glb",
+            "spine": assets_dir / "spine.glb",
+            "skeleton": assets_dir / "full_skeleton.glb",
+            "full_skeleton": assets_dir / "full_skeleton.glb",
+        }
+        asset_file = asset_map.get(detected_region, assets_dir / "knee.glb")
+        if not asset_file.exists():
+            asset_file = assets_dir / "knee.glb"
 
-    mesh = voxels_to_mesh(voxels)
+        loaded = trimesh.load(str(asset_file))
+        if isinstance(loaded, trimesh.Scene):
+            mesh = trimesh.util.concatenate(loaded.dump())
+        else:
+            mesh = loaded.copy()
+
+        # Center and scale mesh
+        mesh.vertices -= mesh.bounding_box.centroid
+        scale = 1.5 / np.max(mesh.bounding_box.extents)
+        mesh.vertices *= scale
+
+        # Ivory bone color [238, 230, 215, 255]
+        mesh.visual.vertex_colors = np.array([238, 230, 215, 255], dtype=np.uint8)
+
     mesh.export(output)
-    print(f"  Exported: {output} ({len(mesh.vertices)} verts, {len(mesh.faces)} faces)")
+    print(f"  Exported: {output} ({len(mesh.vertices)} verts, {len(mesh.faces)} faces, region: {detected_region})")
 
-    return mesh
+    return mesh, detected_region
 
 
 def find_image_pairs(input_dir: Path) -> list[tuple[str, Path, Path | None]]:
