@@ -7,9 +7,16 @@ declare namespace React.JSX {
         alt?: string;
         "camera-controls"?: boolean | string;
         "auto-rotate"?: boolean | string;
+        "rotation-per-second"?: string;
         "shadow-intensity"?: string;
+        "shadow-softness"?: string;
         "environment-image"?: string;
         exposure?: string;
+        "camera-orbit"?: string;
+        "interaction-prompt"?: string;
+        "touch-action"?: string;
+        ar?: boolean | string;
+        "ar-modes"?: string;
       },
       HTMLElement
     >;

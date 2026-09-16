@@ -21,6 +21,8 @@ model/backups/
 
 # Inference outputs
 *.glb
+!assets/*.glb
+!frontend/public/models/*.glb
 
 # Slurm output
 slurm_*.out
